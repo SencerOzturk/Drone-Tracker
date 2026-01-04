@@ -1,0 +1,190 @@
+🧭 GENEL HEDEF
+
+Drone Tracker uygulamasının, bir MQTT broker’a bağlanarak gerçek zamanlı konum ve telemetri verilerini alması.
+
+⚙️ 1. Gereken Teknolojiler
+Katman	Teknoloji	Açıklama
+Frontend (React)	React + Vite	Mevcut uygulama (değişmeden kalacak)
+Realtime Data	MQTT.js	Tarayıcı veya Node üzerinden MQTT bağlantısı
+Broker (Sunucu)	Mosquitto, HiveMQ, veya EMQX	Mesaj sunucusu — drone verilerini yöneten katman
+Drone/Simülatör	(gerçek drone veya script)	MQTT broker’a konum mesajı yayınlar (publish)
+🧩 2. MQTT Nedir Kısaca?
+
+MQTT (Message Queuing Telemetry Transport),
+IoT (Internet of Things) cihazları arasında hafif, gerçek zamanlı veri aktarımı sağlayan bir publish–subscribe protokolüdür.
+
+Publisher (yayıncı): Drone veya sensör
+
+Broker (sunucu): Mesajları yönlendirir
+
+Subscriber (abone): Senin React uygulaman
+
+📡 Örnek konu (topic):
+
+drones/DR-001/telemetry
+
+
+📦 Örnek mesaj (JSON):
+
+{
+  "id": "DR-001",
+  "lat": 41.015,
+  "lng": 28.979,
+  "speed": 42,
+  "altitude": 120,
+  "status": "online"
+}
+
+🪄 3. MQTT Broker Seçimi
+A) Yerel (Local)
+
+Kendi bilgisayarına kurabilirsin:
+
+# Örnek: Mosquitto kurulumu (Ubuntu)
+sudo apt install mosquitto mosquitto-clients
+sudo systemctl enable mosquitto
+sudo systemctl start mosquitto
+
+
+Broker çalıştığında genelde şu portlar aktif olur:
+
+TCP: 1883 (normal bağlantı)
+
+WebSocket: 9001 (tarayıcı bağlantısı için)
+
+B) Bulut Tabanlı (Online)
+
+Hiç kurulum yapmadan test etmek için:
+
+HiveMQ Public Broker
+
+broker.hivemq.com
+port: 8000 (WebSocket)
+topic: drones/#
+
+
+veya EMQX Cloud (Ücretsiz Plan)
+
+⚛️ 4. React Tarafında MQTT Bağlantısı
+
+Vite tabanlı projene mqtt kütüphanesini ekle:
+
+npm install mqtt
+
+🧠 5. useMQTT Hook (Yeni Hook)
+
+Yeni bir dosya oluştur:
+src/hooks/useMQTT.js
+
+import { useEffect, useState } from 'react'
+import mqtt from 'mqtt'
+
+export function useMQTT(brokerUrl, topic) {
+  const [client, setClient] = useState(null)
+  const [messages, setMessages] = useState([])
+
+  useEffect(() => {
+    const client = mqtt.connect(brokerUrl, {
+      clientId: 'drone-tracker-' + Math.random().toString(16).substr(2, 8),
+      reconnectPeriod: 3000,
+    })
+    setClient(client)
+
+    client.on('connect', () => {
+      console.log('✅ MQTT bağlı:', brokerUrl)
+      client.subscribe(topic)
+    })
+
+    client.on('message', (t, payload) => {
+      try {
+        const msg = JSON.parse(payload.toString())
+        setMessages(prev => [...prev.slice(-50), msg]) // son 50 mesajı sakla
+      } catch (e) {
+        console.error('Mesaj parse hatası:', e)
+      }
+    })
+
+    client.on('error', err => console.error('MQTT Hatası:', err))
+    return () => client.end()
+  }, [brokerUrl, topic])
+
+  return { messages }
+}
+
+🧭 6. App.jsx İçinde Kullanımı
+
+Simülasyon hook’u (useLiveDrones) yerine MQTT hook’unu çağır:
+
+import { useMQTT } from './hooks/useMQTT'
+
+export default function App() {
+  const { messages } = useMQTT('wss://broker.hivemq.com:8000/mqtt', 'drones/#')
+
+  const drones = messages.reduce((acc, msg) => {
+    const idx = acc.findIndex(d => d.id === msg.id)
+    if (idx >= 0) acc[idx] = msg
+    else acc.push(msg)
+    return acc
+  }, [])
+
+  return (
+    <div className="app">
+      {/* aynı arayüz: MapView, DroneList, DetailsPanel */}
+    </div>
+  )
+}
+
+
+Bu şekilde her gelen MQTT mesajı haritadaki drone konumlarını günceller.
+Artık “fake hareket” yok — veriler doğrudan broker’dan geliyor 🎯
+
+💡 7. Test İçin MQTT Publisher (örnek)
+
+Gerçek drone yoksa test etmek için terminalden mesaj gönderebilirsin:
+
+# Mosquitto client kullanımı:
+mosquitto_pub -h broker.hivemq.com -p 1883 -t "drones/DR-001/telemetry" \
+-m '{"id":"DR-001","lat":41.015,"lng":28.979,"speed":40,"altitude":120,"status":"online"}'
+
+
+veya Node.js script ile sürekli yayın yapan basit bir simülasyon:
+
+import mqtt from 'mqtt'
+const client = mqtt.connect('mqtt://broker.hivemq.com')
+
+setInterval(() => {
+  const msg = {
+    id: 'DR-001',
+    lat: 41.015 + (Math.random() - 0.5) * 0.01,
+    lng: 28.979 + (Math.random() - 0.5) * 0.01,
+    speed: 30 + Math.random() * 10,
+    altitude: 100 + Math.random() * 20,
+    status: 'online'
+  }
+  client.publish('drones/DR-001/telemetry', JSON.stringify(msg))
+}, 1000)
+
+🔒 8. Güvenlik ve Geliştirme Notları
+Konu	Açıklama
+🔐 Güvenli bağlantı (WSS)	Tarayıcıdan bağlanıyorsan mutlaka wss:// kullan
+🧭 Topic isimlendirme	drones/{droneId}/telemetry yapısı düzenli olur
+🧰 Veri doğrulama	Mesajlarda lat, lng, altitude kontrolü yap
+📈 Performans	Çok sayıda drone varsa useMemo ile render optimizasyonu yap
+🧩 Gelişmiş senaryo	Drone komutlarını göndermek için MQTT publish fonksiyonu eklenebilir
+🚀 Özet Yol Haritası
+Adım	Açıklama
+1️⃣	MQTT broker seç (ör. HiveMQ Cloud)
+2️⃣	React projesine mqtt kütüphanesini ekle
+3️⃣	useMQTT hook’unu yaz
+4️⃣	MQTT mesajlarını drone listesine bağla
+5️⃣	Test için publisher script veya gerçek drone kullan
+6️⃣	Haritada canlı veriyi izle 🎯
+
+İstersen bir sonraki adımda sana:
+
+🔧 “useMQTT hook’una publish (komut gönderme) özelliği nasıl eklenir”
+veya
+📡 “Gerçek drone telemetri formatını (ör. ArduPilot / PX4) MQTT’ye nasıl çevirirsin”
+gösterebilirim.
+
+Hangisini isterdin?

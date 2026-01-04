@@ -1,0 +1,165 @@
+🚁 Drone Tracker – Proje Özeti ve Açıklamalı Yapı
+🎯 Amaç
+
+Harita üzerinde drone konumlarını canlı olarak izleyen, filtrelenebilir, seçim yapılabilen bir mini React uygulaması.
+Gerçek zamanlı veriler simüle ediliyor (arka uç yok).
+
+⚙️ 1) Kullanılan Teknolojiler
+Teknoloji	Rolü
+React 18	Bileşen tabanlı kullanıcı arayüzü geliştirme
+Vite	Hızlı geliştirme sunucusu + üretim build aracı
+React-Leaflet & Leaflet	Harita ve marker bileşenleri
+React Icons	Hızlı ve hafif ikon seti
+CSS (Custom variables)	Tema ve grid yerleşim tasarımı
+Simülasyon Hook (useLiveDrones)	Tarayıcı içinde rastgele drone hareketleri üretir
+🧭 2) Nasıl Çalıştırılır?
+# 1. Bağımlılıkları yükle
+npm install
+
+# 2. Geliştirme sunucusu (vite)
+npm run dev
+
+# 3. Üretim build’i
+npm run build
+
+# 4. Üretim build’ini yerelde test et
+npm run preview --host
+
+🔄 3) Uygulama Akışı (Basit Akış)
+index.html
+ └── #root → React kök kapsayıcısı
+src/main.jsx
+ └── App.jsx → Ana düzen (filtre, harita, detay)
+      ├── DroneList.jsx → Drone listesi + rozetler
+      ├── MapView.jsx → Harita + marker’lar
+      ├── DetailsPanel.jsx → Seçili drone detayları
+      └── useLiveDrones.js → Canlı simülasyon hook’u
+
+
+📂 Veri kaynağı: src/data/mockDrones.js
+🎨 Tema ve grid: src/styles.css
+
+📁 4) Dosya Dosya Açıklamalar
+🧩 package.json
+
+React + Leaflet projeleri için gerekli bağımlılıklar ve Vite script’leri tanımlı.
+
+"vite build" → üretim için Rollup tabanlı paketleme yapar.
+
+"vite preview" → build sonucunu test etmeni sağlar.
+
+⚡ vite.config.js
+plugins: [react()],
+server: { host: true }
+
+
+React eklentisini etkinleştirir.
+
+--host → ağdaki diğer cihazların tarayıcıdan test etmesini sağlar.
+
+🏁 index.html
+
+Sadece bir div#root içerir. React uygulaması buraya “hydrate” edilir.
+Modern <script type="module"> kullanımı dikkat çekici — Vite, modül tabanlı import’ları doğal olarak destekler.
+
+🧠 src/main.jsx
+
+Uygulamanın giriş noktası:
+
+const root = createRoot(document.getElementById('root'))
+root.render(<App />)
+
+
+React.StrictMode geliştirme hatalarını vurgular.
+
+leaflet.css harita bileşenleri için zorunludur.
+
+🗺️ src/components/MapView.jsx
+
+React-Leaflet kullanarak OSM tabanlı harita oluşturur:
+
+MapContainer, TileLayer, Marker, Popup
+
+Drone’lar için marker ve seçili drone için CircleMarker overlay
+
+Ortalama konumu hesaplayarak harita merkezini ayarlar
+
+📍 İpucu: useMemo → drone listesi değişmedikçe merkez konumu yeniden hesaplamaz.
+
+📋 src/components/DroneList.jsx
+
+Drone listesini kart şeklinde gösterir:
+
+Her satır bir drone’a karşılık gelir.
+
+Seçili drone, mavi kenarlıkla vurgulanır.
+
+StatusBadge bileşeni durumlara göre renkli rozet üretir.
+
+Durum renkleri:
+
+Durum	Renk	Türkçe
+online	yeşil	Aktif
+idle	sarı	Beklemede
+alert	kırmızı	Uyarı
+🧭 src/components/DetailsPanel.jsx
+
+Seçili drone’a ait bilgiler:
+
+Ad, ID, konum, hız, irtifa
+
+Eylem butonları: “Takip Et”, “Rota Göster”, “Komut Gönder”
+(şu anlık görsel amaçlı, henüz fonksiyonel değil)
+
+🪶 src/hooks/useLiveDrones.js
+
+Bu hook uygulamanın “canlılık” kısmını sağlar:
+
+setInterval ile her 1.5 saniyede konum, hız, irtifa ve durum güncellenir.
+
+Basit rastgele hareket algoritması (dx/dy)
+
+refresh() → simülasyon verisini tazeler
+
+selectedDrone → seçili drone nesnesini hesaplar
+
+📘 Hook mantığı:
+
+return { drones, refresh, isRefreshing, selectedId, setSelectedId, selectedDrone }
+
+📊 src/data/mockDrones.js
+
+Statik başlangıç verisi (örnek 4 drone):
+
+{ id: 'DR-001', name: 'Anka-1', status: 'online', lat: 41.015, lng: 28.979 }
+
+🎨 src/styles.css
+
+CSS değişkenleri ile tema oluşturulmuş (--bg, --accent, --text).
+
+CSS Grid → 3 sütunlu düzen: sidebar | content | details
+
+Bileşen tabanlı stiller → .list-item, .badge, .kv, .controls
+
+Dark tema uyumlu, sade, profesyonel görünüm.
+
+💡 5) Öğrenme Notları (Özet)
+Konu	Açıklama
+Bileşen mimarisi	Görsel bölümler ayrı React bileşenleriyle düzenlenmiş.
+Durum yönetimi	useState + useMemo filtreleme ve seçim için yeterli.
+Özel hook (Custom Hook)	useLiveDrones() ile tekrar kullanılabilir canlı veri mantığı oluşturulmuş.
+Harita entegrasyonu	React-Leaflet sayesinde deklaratif harita kurulum.
+Tema ve layout	CSS değişkenleriyle karanlık tema + grid tabanlı yerleşim.
+🧭 Sonuç
+
+Drone Tracker, küçük ama iyi yapılandırılmış bir React projesi örneğidir:
+
+Gerçek zamanlı veri akışı (simüle)
+
+Harita görselleştirmesi
+
+Filtreleme ve detay yönetimi
+
+Modern build tool (Vite)
+
+Sade ama profesyonel UI

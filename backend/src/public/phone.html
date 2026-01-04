@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📡 Phone Drone Telemetry</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 24px;
+    }
+    .status {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .status-item:last-child {
+      border-bottom: none;
+    }
+    .status-label {
+      font-weight: 600;
+      opacity: 0.9;
+    }
+    .status-value {
+      font-weight: 700;
+      font-size: 18px;
+    }
+    .connection-status {
+      text-align: center;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-weight: 600;
+    }
+    .connected {
+      background: rgba(76, 175, 80, 0.3);
+      border: 2px solid #4caf50;
+    }
+    .disconnected {
+      background: rgba(244, 67, 54, 0.3);
+      border: 2px solid #f44336;
+    }
+    .battery-bar {
+      width: 100%;
+      height: 30px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 15px;
+      overflow: hidden;
+      margin-top: 10px;
+      position: relative;
+    }
+    .battery-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4caf50, #8bc34a);
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .battery-low {
+      background: linear-gradient(90deg, #f44336, #ff9800);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📡 Drone Telemetry System</h1>
+    
+    <div id="connectionStatus" class="connection-status disconnected">
+      🔴 Bağlantı Bekleniyor...
+    </div>
+
+    <div class="status">
+      <div class="status-item">
+        <span class="status-label">📍 Konum</span>
+        <span class="status-value" id="location">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">⚡ Hız (Hesaplanmış)</span>
+        <span class="status-value" id="speed">0 km/h</span>
+      </div>
+      <div class="status-item" id="speedInfo" style="font-size: 12px; opacity: 0.7; padding-top: 5px;">
+        <span>💡 İlk veri için telefonu en az 5-10 metre hareket ettirin</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">⬆️ İrtifa (Mutlak)</span>
+        <span class="status-value" id="absoluteAltitude">- m</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">📊 İrtifa (Bağıl)</span>
+        <span class="status-value" id="relativeAltitude">0 m</span>
+      </div>
+      <div class="status-item" id="altitudeInfo" style="font-size: 12px; opacity: 0.7; padding-top: 5px;">
+        <span>💡 İrtifa hesaplanıyor...</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">🧭 Yön (Heading)</span>
+        <span class="status-value" id="heading">-°</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">🔋 Batarya</span>
+        <span class="status-value" id="battery">-</span>
+      </div>
+      <div class="battery-bar">
+        <div class="battery-fill" id="batteryFill" style="width: 0%">0%</div>
+      </div>
+    </div>
+
+    <!-- Debug Bilgileri -->
+    <div class="status" style="margin-top: 20px; background: rgba(0, 0, 0, 0.2);">
+      <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">🔍 Debug Bilgileri</div>
+      <div class="status-item">
+        <span class="status-label">Raw Altitude (Cihazdan)</span>
+        <span class="status-value" id="rawAltitude">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Raw Speed (Cihazdan)</span>
+        <span class="status-value" id="rawSpeed">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">Home Altitude</span>
+        <span class="status-value" id="homeAltitude">-</span>
+      </div>
+      <div class="status-item" id="homePointInfo" style="font-size: 12px; opacity: 0.7; padding-top: 5px;">
+        <span>📍 Home point koordinatları yükleniyor...</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">GPS Güncellemeleri</span>
+        <span class="status-value" id="updateCount">0</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { io } from "https://cdn.socket.io/4.7.5/socket.io.esm.min.js";
+
+    // Socket.IO bağlantısı
+    const socket = io("/", { transports: ["websocket"] });
+    const droneId = "phone-" + Date.now(); // Unique drone ID
+
+    // UI elementleri
+    const connectionStatus = document.getElementById("connectionStatus");
+    const locationEl = document.getElementById("location");
+    const speedEl = document.getElementById("speed");
+    const absoluteAltitudeEl = document.getElementById("absoluteAltitude");
+    const relativeAltitudeEl = document.getElementById("relativeAltitude");
+    const headingEl = document.getElementById("heading");
+    const batteryEl = document.getElementById("battery");
+    const batteryFill = document.getElementById("batteryFill");
+    const rawAltitudeEl = document.getElementById("rawAltitude");
+    const rawSpeedEl = document.getElementById("rawSpeed");
+    const homeAltitudeEl = document.getElementById("homeAltitude");
+    const updateCountEl = document.getElementById("updateCount");
+    const speedInfoEl = document.getElementById("speedInfo");
+    const altitudeInfoEl = document.getElementById("altitudeInfo");
+    const homePointInfoEl = document.getElementById("homePointInfo");
+
+    let updateCount = 0;
+
+    // Bağlantı durumu
+    socket.on("connect", () => {
+      console.log("✅ Socket bağlı:", socket.id);
+      connectionStatus.textContent = "🟢 Bağlı: " + socket.id;
+      connectionStatus.className = "connection-status connected";
+    });
+
+    socket.on("disconnect", () => {
+      console.log("❌ Socket bağlantısı kesildi");
+      connectionStatus.textContent = "🔴 Bağlantı Kesildi";
+      connectionStatus.className = "connection-status disconnected";
+    });
+
+    // Backend'den gelen hesaplanmış telemetri verilerini dinle
+    socket.on("telemetry_update", (data) => {
+      updateCount++;
+      console.log("📊 Telemetry Update #" + updateCount + ":", data);
+      
+      // Konum
+      locationEl.textContent = `${data.latitude.toFixed(6)}, ${data.longitude.toFixed(6)}`;
+      
+      // Hız (hesaplanmış)
+      const calculatedSpeed = data.calculatedSpeed || 0;
+      speedEl.textContent = `${calculatedSpeed} km/h`;
+      
+      // Hız bilgilendirmesi
+      if (calculatedSpeed === 0 && updateCount > 1) {
+        speedInfoEl.innerHTML = '<span style="color: #ff9800;">⚠️ Hareket edin! Hız hesaplanması için en az 5-10 metre hareket gerekli.</span>';
+      } else if (calculatedSpeed > 0) {
+        speedInfoEl.innerHTML = '<span style="color: #4caf50;">✅ Hız başarıyla hesaplandı</span>';
+      } else {
+        speedInfoEl.innerHTML = '<span>💡 İlk veri için telefonu hareket ettirin</span>';
+      }
+      
+      // İrtifa (mutlak)
+      const absoluteAlt = data.absoluteAltitude !== undefined ? data.absoluteAltitude : (data.altitude || 0);
+      absoluteAltitudeEl.textContent = `${absoluteAlt.toFixed(1)} m`;
+      
+      // İrtifa (bağıl - home'a göre)
+      const relativeAlt = data.relativeAltitude !== undefined ? data.relativeAltitude : 0;
+      relativeAltitudeEl.textContent = `${relativeAlt.toFixed(1)} m`;
+      
+      // Home altitude bilgisi
+      if (data.homeAltitude !== undefined) {
+        homeAltitudeEl.textContent = `${data.homeAltitude.toFixed(1)} m`;
+        
+        // İrtifa kaynağını belirle
+        if (data.altitude !== null && data.altitude !== undefined) {
+          altitudeInfoEl.innerHTML = `<span style="color: #4caf50;">✅ Home point: ${data.homeAltitude.toFixed(1)} m (Cihazdan alındı)</span>`;
+        } else {
+          altitudeInfoEl.innerHTML = `<span style="color: #2196f3;">🌐 Home point: ${data.homeAltitude.toFixed(1)} m (GPS API'den hesaplandı)</span>`;
+        }
+      }
+
+      // Home point koordinatları
+      if (data.homeLatitude !== undefined && data.homeLongitude !== undefined) {
+        homePointInfoEl.innerHTML = `<span style="color: #4caf50;">🏠 Home Point: ${data.homeLatitude.toFixed(5)}, ${data.homeLongitude.toFixed(5)}</span>`;
+      } else {
+        homePointInfoEl.innerHTML = `<span>📍 Home point: İlk konumunuz referans noktası olarak belirlendi</span>`;
+      }
+      
+      // Raw altitude (cihazdan gelen)
+      if (data.altitude !== null && data.altitude !== undefined) {
+        rawAltitudeEl.textContent = `${data.altitude.toFixed(1)} m (cihazdan)`;
+      } else {
+        rawAltitudeEl.textContent = "null (GPS API kullanılıyor)";
+      }
+      
+      // Raw speed (cihazdan gelen, m/s)
+      if (data.speed !== undefined) {
+        rawSpeedEl.textContent = `${data.speed.toFixed(2)} m/s (${(data.speed * 3.6).toFixed(2)} km/h)`;
+      } else {
+        rawSpeedEl.textContent = "-";
+      }
+      
+      // Heading (yön)
+      const heading = data.heading || 0;
+      headingEl.textContent = `${heading.toFixed(0)}°`;
+      
+      // Batarya
+      const batteryPercent = (data.battery * 100).toFixed(0);
+      batteryEl.textContent = `${batteryPercent}%`;
+      batteryFill.style.width = `${data.battery * 100}%`;
+      batteryFill.textContent = `${batteryPercent}%`;
+      
+      // Batarya düşükse kırmızı göster
+      if (data.battery < 0.2) {
+        batteryFill.classList.add("battery-low");
+      } else {
+        batteryFill.classList.remove("battery-low");
+      }
+      
+      // Güncelleme sayısı
+      updateCountEl.textContent = updateCount;
+    });
+
+    // GPS konum takibi
+    let watchId = null;
+
+    // Batarya API'si (destekleniyorsa)
+    async function getBatteryLevel() {
+      try {
+        if ('getBattery' in navigator) {
+          const battery = await navigator.getBattery();
+          return battery.level;
+        }
+        // Fallback: Simüle edilmiş batarya (gerçek uygulamada sensörden gelir)
+        return 0.75;
+      } catch (e) {
+        console.warn("Battery API desteklenmiyor, varsayılan değer kullanılıyor");
+        return 0.75;
+      }
+    }
+
+    // GPS izleme başlat
+    function startTracking() {
+      if (!navigator.geolocation) {
+        alert("GPS desteklenmiyor!");
+        return;
+      }
+
+      watchId = navigator.geolocation.watchPosition(
+        async (position) => {
+          const { latitude, longitude, altitude, speed, heading, accuracy } = position.coords;
+          const timestamp = position.timestamp || Date.now();
+          
+          // Batarya seviyesini al
+          const battery = await getBatteryLevel();
+
+          // Telemetri verisini backend'e gönder
+          socket.emit("telemetry", {
+            droneId,
+            latitude,
+            longitude,
+            altitude: altitude !== null && altitude !== undefined ? altitude : null, // null gönder, backend hesaplasın
+            speed: speed !== null && speed !== undefined ? speed : 0, // m/s (raw)
+            heading: heading !== null && heading !== undefined ? heading : 0,
+            battery: battery,
+            timestamp: timestamp
+          });
+
+          console.log("📤 Telemetry gönderildi #" + (updateCount + 1) + ":", {
+            latitude: latitude.toFixed(6),
+            longitude: longitude.toFixed(6),
+            altitude: altitude !== null ? altitude.toFixed(1) + " m" : "null",
+            speed: speed !== null ? (speed * 3.6).toFixed(2) + " km/h" : "0",
+            heading: heading !== null ? heading.toFixed(0) + "°" : "0°",
+            battery: (battery * 100).toFixed(0) + "%"
+          });
+        },
+        (error) => {
+          console.error("❌ GPS hata:", error);
+          alert(`GPS Hatası: ${error.message}`);
+        },
+        {
+          enableHighAccuracy: true, // Yüksek doğruluk için
+          maximumAge: 1000, // 1 saniye önceki veriyi kabul et
+          timeout: 10000 // 10 saniye timeout
+        }
+      );
+    }
+
+    // Sayfa yüklendiğinde izlemeyi başlat
+    startTracking();
+
+    // Sayfa kapanırken izlemeyi durdur
+    window.addEventListener("beforeunload", () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      socket.disconnect();
+    });
+  </script>
+</body>
+</html>

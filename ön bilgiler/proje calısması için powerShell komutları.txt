@@ -1,0 +1,4 @@
+cd drone-tracker
+ls
+npm run dev
+sonra local/host kısmını kopyala yapıştır.

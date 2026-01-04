@@ -1,0 +1,448 @@
+Drone Tracker - Proje Özeti ve Kodlarla Açıklama (TR)
+
+1) Kullanılan Teknolojiler
+- React 18: Bileşen tabanlı UI geliştirme.
+- Vite: Hızlı geliştirme sunucusu ve üretim derlemesi.
+- React-Leaflet + Leaflet: Harita ve marker gösterimi.
+- React Icons: UI ikonları.
+- CSS: Tema ve yerleşim stilleri.
+- Not: Sunucu/arka uç yok; veri tarayıcı içinde simüle ediliyor.
+
+2) Nasıl Çalıştırılır?
+- Geliştirme: npm run dev
+- Derleme: npm run build
+- Önizleme: npm run preview --host
+
+3) Uygulama Akışı (Kısa)
+- index.html: #root kapsayıcısı.
+- src/main.jsx: React uygulamasını başlatır, stilleri yükler.
+- src/App.jsx: Sayfa düzeni, filtreler, harita, detay paneli.
+- src/hooks/useLiveDrones.js: Canlı drone hareket simülasyonu ve seçim yönetimi.
+- src/components/MapView.jsx: Harita ve marker’lar.
+- src/components/DroneList.jsx: Liste ve durum rozetleri.
+- src/components/DetailsPanel.jsx: Seçili drone detayları.
+- src/data/mockDrones.js: Başlangıç (sahte) veriler.
+- src/styles.css: Tema ve yerleşim stilleri.
+- vite.config.js: Vite yapılandırması.
+- package.json: Bağımlılıklar ve script’ler.
+
+4) Dosya Dosya Açıklama ve Kodlar
+
+--- package.json (script’ler ve bağımlılıklar) ---
+{
+  "name": "drone-tracker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-icons": "^5.2.1",
+    "react-leaflet": "^4.2.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.0"
+  }
+}
+
+--- vite.config.js (Vite + React eklentisi) ---
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  server: { host: true }
+})
+
+--- index.html (React kök kapsayıcısı) ---
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Drone Tracker</title>
+    <meta name="color-scheme" content="dark light">
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+
+--- src/main.jsx (uygulamayı başlatır) ---
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import App from './App.jsx'
+import './styles.css'
+import 'leaflet/dist/leaflet.css'
+
+const container = document.getElementById('root')
+const root = createRoot(container)
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+)
+
+--- src/App.jsx (ana düzen ve filtreleme) ---
+import React, { useMemo, useState } from 'react'
+import { FiMapPin, FiActivity, FiRefreshCw } from 'react-icons/fi'
+import MapView from './components/MapView.jsx'
+import DroneList from './components/DroneList.jsx'
+import DetailsPanel from './components/DetailsPanel.jsx'
+import { useLiveDrones } from './hooks/useLiveDrones.js'
+
+export default function App() {
+  const { drones, refresh, isRefreshing, setSelectedId, selectedId, selectedDrone } = useLiveDrones()
+  const [query, setQuery] = useState('')
+  const [status, setStatus] = useState('all')
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return drones.filter(d => {
+      const matchQ = !q || d.name.toLowerCase().includes(q) || d.id.toLowerCase().includes(q)
+      const matchS = status === 'all' || d.status === status
+      return matchQ && matchS
+    })
+  }, [drones, query, status])
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <div className="brand">
+          <FiMapPin size={18} />
+          <span>Drone Tracker</span>
+        </div>
+        <div className="header-actions">
+          <button onClick={refresh} disabled={isRefreshing}>
+            <FiRefreshCw style={{ marginRight: 6 }} /> Yenile
+          </button>
+          <button className="primary">
+            <FiActivity style={{ marginRight: 6 }} /> Yeni Uçuş
+          </button>
+        </div>
+      </header>
+
+      <main className="app-main">
+        <aside className="sidebar">
+          <div className="section-header">
+            <strong>Filtreler</strong>
+          </div>
+          <div className="controls">
+            <input className="input" placeholder="Ara: ID, ad" value={query} onChange={e => setQuery(e.target.value)} />
+          </div>
+          <div className="filters">
+            <select className="select" value={status} onChange={e => setStatus(e.target.value)}>
+              <option value="all">Tümü</option>
+              <option value="online">Aktif</option>
+              <option value="idle">Beklemede</option>
+              <option value="alert">Uyarı</option>
+            </select>
+            <select className="select" onChange={e => e.target.value}>
+              <option>Filtre 2</option>
+            </select>
+          </div>
+          <DroneList drones={filtered} selectedId={selectedId} onSelect={setSelectedId} />
+        </aside>
+
+        <section className="content">
+          <MapView drones={filtered} selectedId={selectedId} onSelect={setSelectedId} />
+        </section>
+
+        <aside className="details">
+          <div className="section-header">
+            <strong>Detaylar</strong>
+          </div>
+          <DetailsPanel drone={selectedDrone} />
+        </aside>
+      </main>
+    </div>
+  )
+}
+
+--- src/hooks/useLiveDrones.js (canlı veri simülasyonu) ---
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { initialDrones } from '../data/mockDrones.js'
+
+export function useLiveDrones() {
+  const [drones, setDrones] = useState(initialDrones)
+  const [selectedId, setSelectedId] = useState(initialDrones[0]?.id ?? null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      setDrones(prev =>
+        prev.map(d => {
+          // Basit simulasyon: rasgele yön ve küçük hareket
+          const dx = (Math.random() - 0.5) * 0.02
+          const dy = (Math.random() - 0.5) * 0.02
+          const speed = Math.max(0, d.speed + (Math.random() - 0.5) * 3)
+          const altitude = Math.max(0, d.altitude + (Math.random() - 0.5) * 5)
+          const statusRand = Math.random()
+          let status = d.status
+          if (statusRand > 0.985) status = 'alert'
+          else if (statusRand > 0.94) status = 'idle'
+          else status = 'online'
+
+          return { ...d, lat: d.lat + dx, lng: d.lng + dy, speed, altitude, status }
+        })
+      )
+    }, 1500)
+    return () => clearInterval(timerRef.current)
+  }, [])
+
+  const refresh = async () => {
+    setIsRefreshing(true)
+    await new Promise(r => setTimeout(r, 500))
+    setIsRefreshing(false)
+  }
+
+  const selectedDrone = useMemo(
+    () => drones.find(d => d.id === selectedId) ?? null,
+    [drones, selectedId]
+  )
+
+  return { drones, refresh, isRefreshing, selectedId, setSelectedId, selectedDrone }
+}
+
+--- src/data/mockDrones.js (başlangıç verisi) ---
+export const initialDrones = [
+  { id: 'DR-001', name: 'Anka-1', status: 'online', lat: 41.015, lng: 28.979, speed: 42, altitude: 120 },
+  { id: 'DR-002', name: 'Bay-2', status: 'idle',   lat: 39.9208, lng: 32.8541, speed: 0, altitude: 40 },
+  { id: 'DR-003', name: 'Kuzgun-3', status: 'online', lat: 38.4237, lng: 27.1428, speed: 36, altitude: 200 },
+  { id: 'DR-004', name: 'Samur-4', status: 'alert', lat: 37.0, lng: 35.3213, speed: 15, altitude: 80 }
+]
+
+--- src/components/MapView.jsx (harita ve marker’lar) ---
+import React, { useMemo } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from 'react-leaflet'
+import L from 'leaflet'
+
+const defaultIcon = new L.Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+})
+
+export default function MapView({ drones, selectedId, onSelect }) {
+  const center = useMemo(() => {
+    if (drones.length === 0) return [39.9208, 32.8541] // Ankara fallback
+    const avgLat = drones.reduce((s, d) => s + d.lat, 0) / drones.length
+    const avgLng = drones.reduce((s, d) => s + d.lng, 0) / drones.length
+    return [avgLat, avgLng]
+  }, [drones])
+
+  return (
+    <div className="map-container">
+      <MapContainer center={center} zoom={6} scrollWheelZoom style={{ height: '100%', width: '100%' }}>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {drones.map(d => (
+          <Marker
+            key={d.id}
+            position={[d.lat, d.lng]}
+            icon={defaultIcon}
+            eventHandlers={{ click: () => onSelect(d.id) }}
+          >
+            <Popup>
+              <div style={{ minWidth: 160 }}>
+                <strong>{d.name}</strong>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>{d.id}</div>
+                <div style={{ marginTop: 6, fontSize: 12 }}>Durum: {d.status}</div>
+                <div style={{ fontSize: 12 }}>Hız: {d.speed.toFixed(1)} km/s</div>
+                <div style={{ fontSize: 12 }}>İrtifa: {d.altitude.toFixed(0)} m</div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+        {selectedId && (() => {
+          const d = drones.find(x => x.id === selectedId)
+          if (!d) return null
+          return (
+            <CircleMarker
+              center={[d.lat, d.lng]}
+              radius={24}
+              pathOptions={{ color: '#47b2ff', opacity: 0.6 }}
+            />
+          )
+        })()}
+      </MapContainer>
+    </div>
+  )
+}
+
+--- src/components/DroneList.jsx (liste ve rozetler) ---
+import React from 'react'
+
+function StatusBadge({ status }) {
+  const cls = status === 'online' ? 'badge online'
+    : status === 'alert' ? 'badge alert'
+    : status === 'idle' ? 'badge idle'
+    : 'badge'
+  const text = status === 'online' ? 'Aktif' : status === 'idle' ? 'Beklemede' : status === 'alert' ? 'Uyarı' : status
+  return <span className={cls}>{text}</span>
+}
+
+export default function DroneList({ drones, selectedId, onSelect }) {
+  return (
+    <>
+      <div className="section-header" style={{ borderTop: '1px solid var(--border)' }}>
+        <strong>Dronelar</strong>
+        <span style={{ color: 'var(--muted)', fontSize: 12 }}>{drones.length}</span>
+      </div>
+      <div className="list">
+        {drones.map(d => (
+          <div
+            key={d.id}
+            className="list-item"
+            onClick={() => onSelect(d.id)}
+            style={selectedId === d.id ? { borderColor: 'var(--accent)' } : undefined}
+          >
+            <div>
+              <div style={{ fontWeight: 600 }}>{d.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{d.id}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <StatusBadge status={d.status} />
+            </div>
+          </div>
+        ))}
+        {drones.length === 0 && <div style={{ color: 'var(--muted)', padding: 12 }}>Kayıt bulunamadı.</div>}
+      </div>
+    </>
+  )
+}
+
+--- src/components/DetailsPanel.jsx (seçili drone detayları) ---
+import React from 'react'
+
+export default function DetailsPanel({ drone }) {
+  if (!drone) {
+    return <div className="details-body" style={{ color: 'var(--muted)' }}>Bir drone seçiniz.</div>
+  }
+  return (
+    <div className="details-body">
+      <div className="kv"><div className="k">Ad</div><div className="v">{drone.name}</div></div>
+      <div className="kv"><div className="k">ID</div><div className="v">{drone.id}</div></div>
+      <div className="kv"><div className="k">Durum</div><div className="v">{drone.status}</div></div>
+      <div className="kv"><div className="k">Konum</div><div className="v">{drone.lat.toFixed(5)}, {drone.lng.toFixed(5)}</div></div>
+      <div className="kv"><div className="k">Hız</div><div className="v">{drone.speed.toFixed(1)} km/s</div></div>
+      <div className="kv"><div className="k">İrtifa</div><div className="v">{drone.altitude.toFixed(0)} m</div></div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button>Takip Et</button>
+        <button>Rota Göster</button>
+        <button className="primary">Komut Gönder</button>
+      </div>
+    </div>
+  )
+}
+
+--- src/styles.css (tema ve yerleşim stilleri) ---
+:root {
+  --bg: #0c0f14;
+  --panel: #141922;
+  --panel-2: #121621;
+  --text: #e8eef7;
+  --muted: #9bb0c0;
+  --accent: #47b2ff;
+  --success: #3ddb8b;
+  --danger: #ff6b6b;
+  --warning: #ffd166;
+  --border: #223046;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+.app { display: grid; grid-template-rows: 56px 1fr; height: 100%; }
+.app-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.brand span { letter-spacing: 0.2px; }
+.header-actions { display: flex; gap: 8px; }
+button {
+  background: transparent; border: 1px solid var(--border); color: var(--text);
+  padding: 8px 12px; border-radius: 8px; cursor: pointer;
+}
+button.primary { background: var(--accent); color: #04121e; border: none; }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.app-main {
+  display: grid;
+  grid-template-columns: 320px 1fr 360px;
+  gap: 12px;
+  padding: 12px;
+}
+
+.sidebar, .details, .content {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.section-header {
+  padding: 12px 12px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.list {
+  padding: 8px; display: flex; flex-direction: column; gap: 8px; max-height: calc(100% - 49px); overflow: auto;
+}
+.list-item {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #0f1420;
+  cursor: pointer;
+}
+.list-item:hover { border-color: var(--accent); }
+.badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #0d1725; border: 1px solid var(--border); color: var(--muted); }
+.badge.online { color: var(--success); border-color: #2a5a48; background: #0c1916; }
+.badge.alert { color: var(--danger); border-color: #5a2a2a; background: #190c0c; }
+.badge.idle { color: var(--warning); border-color: #5a512a; background: #19160c; }
+
+.content { position: relative; }
+.map-container { height: 100%; }
+
+.details-body { padding: 12px; display: grid; gap: 12px; }
+.kv { display: grid; grid-template-columns: 120px 1fr; gap: 8px; }
+.kv .k { color: var(--muted); }
+.kv .v { font-weight: 600; }
+
+.controls { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px; }
+.input, .select {
+  width: 100%; background: #0f1420; color: var(--text); border: 1px solid var(--border);
+  padding: 8px 10px; border-radius: 8px; outline: none;
+}
+.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px 12px 12px; }
+
+.leaflet-container { background: #0a0f18; }
+
+5) Öğrenme Notları
+- Bileşen mantığı: Harita, liste, detay ayrı React bileşenleri.
+- Durum yönetimi: useState ve useMemo ile filtre ve seçim.
+- Özel hook: useLiveDrones ile tekrarlanabilir canlı veri mantığı.
+- Harita: React-Leaflet bileşenleri ile deklaratif kurulum.
+- Stiller: CSS değişkenleri ve grid düzeni.
