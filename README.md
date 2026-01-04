@@ -620,7 +620,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Muhammed Sencer Öztürk**
 
-- Front-End Developer & Computer Engineering Student
+- Backend Developer & Computer Engineering Student
 - Aspiring to build real-time visualization and IoT-driven web apps
 
 ---
@@ -644,7 +644,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Muhammed Sencer ÖZTÜRK - Computer Engineering Student**
+**Muhammed Sencer ÖZTÜRK - Backend Developer & Computer Engineering Student**
 
 
 </div>
