@@ -644,8 +644,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Made with ❤️ for real-time drone tracking**
+**Muhammed Sencer ÖZTÜRK - Computer Engineering Student**
 
-⭐ Star this repo if you find it helpful!
 
 </div>
